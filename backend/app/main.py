@@ -1,0 +1,37 @@
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.v1 import router as api_router
+from app.api.websocket import router as ws_router
+from app.core.redis_client import close_redis
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    await close_redis()
+
+
+app = FastAPI(
+    title="GameSense Cricket Analytics",
+    description="Real-time T20 cricket analytics platform",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(api_router)
+app.include_router(ws_router)
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "gamesense-backend"}
