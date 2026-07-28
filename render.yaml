@@ -1,0 +1,157 @@
+## Render Blueprint — GameSense Cricket Analytics
+## https://render.com/docs/blueprint-spec
+##
+## External prerequisite: Kafka is not provided by Render.
+## Create a free Kafka cluster on Confluent Cloud (https://confluent.cloud) or
+## Upstash Kafka (https://upstash.com/kafka), then supply the three KAFKA_*
+## env vars below that are marked `sync: false`.
+##
+## After blueprint is applied, set VITE_API_URL on the frontend service
+## to the backend's Render URL (e.g. https://gamesense-backend.onrender.com).
+
+databases:
+  - name: gamesense-db
+    databaseName: gamesense
+    user: gamesense
+    plan: free
+
+services:
+  # ── Managed Redis ──────────────────────────────────────────────────────────
+  - type: redis
+    name: gamesense-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+
+  # ── FastAPI Backend ────────────────────────────────────────────────────────
+  - type: web
+    name: gamesense-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    # Run DB migrations then start the server; Render injects $PORT automatically
+    startCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gamesense-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: gamesense-redis
+          property: connectionString
+      # ── Kafka (supply values from your cloud Kafka provider) ──
+      - key: KAFKA_BOOTSTRAP_SERVERS
+        sync: false
+      - key: KAFKA_SECURITY_PROTOCOL
+        value: SASL_SSL
+      - key: KAFKA_SASL_MECHANISM
+        value: PLAIN
+      - key: KAFKA_SASL_USERNAME
+        sync: false
+      - key: KAFKA_SASL_PASSWORD
+        sync: false
+      # ── App secrets ──
+      - key: CRICAPI_KEY
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+
+  # ── Celery Worker ──────────────────────────────────────────────────────────
+  - type: worker
+    name: gamesense-celery-worker
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    startCommand: celery -A celery_app.celery worker -l info -Q cricket-poller
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gamesense-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: gamesense-redis
+          property: connectionString
+      - key: KAFKA_BOOTSTRAP_SERVERS
+        sync: false
+      - key: KAFKA_SECURITY_PROTOCOL
+        value: SASL_SSL
+      - key: KAFKA_SASL_MECHANISM
+        value: PLAIN
+      - key: KAFKA_SASL_USERNAME
+        sync: false
+      - key: KAFKA_SASL_PASSWORD
+        sync: false
+      - key: CRICAPI_KEY
+        sync: false
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: gamesense-backend
+          envVarKey: SECRET_KEY
+      - key: ENVIRONMENT
+        value: production
+
+  # ── Celery Beat (scheduler) ────────────────────────────────────────────────
+  - type: worker
+    name: gamesense-celery-beat
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    # Write schedule to /tmp so it survives on the ephemeral filesystem
+    startCommand: celery -A celery_app.celery beat -l info --schedule /tmp/celerybeat-schedule
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gamesense-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: gamesense-redis
+          property: connectionString
+      - key: KAFKA_BOOTSTRAP_SERVERS
+        sync: false
+      - key: KAFKA_SECURITY_PROTOCOL
+        value: SASL_SSL
+      - key: KAFKA_SASL_MECHANISM
+        value: PLAIN
+      - key: KAFKA_SASL_USERNAME
+        sync: false
+      - key: KAFKA_SASL_PASSWORD
+        sync: false
+      - key: CRICAPI_KEY
+        sync: false
+      - key: SECRET_KEY
+        fromService:
+          type: web
+          name: gamesense-backend
+          envVarKey: SECRET_KEY
+      - key: ENVIRONMENT
+        value: production
+
+  # ── React Frontend (static site) ───────────────────────────────────────────
+  - type: web
+    name: gamesense-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    plan: free
+    envVars:
+      # Set this to your backend Render URL after first deploy
+      # e.g. https://gamesense-backend.onrender.com
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
