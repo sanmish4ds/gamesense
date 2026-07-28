@@ -21,6 +21,7 @@ services:
     name: gamesense-redis
     plan: free
     maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
 
   # ── FastAPI Backend ────────────────────────────────────────────────────────
   - type: web
@@ -29,8 +30,6 @@ services:
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
     plan: free
-    # Run DB migrations then start the server; Render injects $PORT automatically
-    startCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
@@ -65,10 +64,9 @@ services:
   - type: worker
     name: gamesense-celery-worker
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
+    dockerfilePath: ./backend/Dockerfile.worker
     dockerContext: ./backend
     plan: free
-    startCommand: celery -A celery_app.celery worker -l info -Q cricket-poller
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -103,11 +101,9 @@ services:
   - type: worker
     name: gamesense-celery-beat
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
+    dockerfilePath: ./backend/Dockerfile.beat
     dockerContext: ./backend
     plan: free
-    # Write schedule to /tmp so it survives on the ephemeral filesystem
-    startCommand: celery -A celery_app.celery beat -l info --schedule /tmp/celerybeat-schedule
     envVars:
       - key: DATABASE_URL
         fromDatabase:
