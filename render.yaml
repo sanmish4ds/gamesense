@@ -56,6 +56,8 @@ services:
       # ── App secrets ──
       - key: CRICAPI_KEY
         sync: false
+      - key: POLL_INTERVAL_SECONDS
+        value: "900"
       - key: SECRET_KEY
         generateValue: true
       - key: ENVIRONMENT

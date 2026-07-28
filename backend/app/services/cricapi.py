@@ -20,8 +20,14 @@ class CricAPIClient:
             raise ValueError(f"CricAPI error: {data.get('info', 'unknown')}")
         return data
 
+    # ── Matches ───────────────────────────────────────────────────────────────
+
     async def list_current_matches(self, offset: int = 0) -> list[dict]:
         data = await self._get("currentMatches", {"offset": offset})
+        return data.get("data", [])
+
+    async def list_matches(self, offset: int = 0) -> list[dict]:
+        data = await self._get("matches", {"offset": offset})
         return data.get("data", [])
 
     async def get_match_info(self, match_id: str) -> dict:
@@ -31,6 +37,31 @@ class CricAPIClient:
     async def get_scorecard(self, match_id: str) -> dict:
         data = await self._get("match_scorecard", {"id": match_id})
         return data.get("data", {})
+
+    async def get_live_score(self, match_id: str) -> dict:
+        """eCricScore — real-time ball-by-ball live score."""
+        data = await self._get("match_scorecard", {"id": match_id})
+        return data.get("data", {})
+
+    # ── Series ────────────────────────────────────────────────────────────────
+
+    async def list_series(self, offset: int = 0) -> list[dict]:
+        data = await self._get("series", {"offset": offset})
+        return data.get("data", [])
+
+    async def get_series_info(self, series_id: str) -> dict:
+        data = await self._get("series_info", {"id": series_id})
+        return data.get("data", {})
+
+    async def get_series_matches(self, series_id: str) -> list[dict]:
+        data = await self._get("series_info", {"id": series_id})
+        return data.get("data", {}).get("matchList", [])
+
+    async def get_points_table(self, series_id: str) -> list[dict]:
+        data = await self._get("series_points_table", {"id": series_id})
+        return data.get("data", [])
+
+    # ── Players ───────────────────────────────────────────────────────────────
 
     async def search_player(self, name: str) -> list[dict]:
         data = await self._get("players", {"search": name, "offset": 0})

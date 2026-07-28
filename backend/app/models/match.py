@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import String, DateTime, Boolean, Integer, JSON, func, Float
+from sqlalchemy import String, Text, DateTime, Boolean, Integer, JSON, func, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
@@ -10,7 +10,7 @@ class Match(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     match_type: Mapped[str] = mapped_column(String(20), nullable=True)  # T20/ODI/Test
-    status: Mapped[str] = mapped_column(String(50), nullable=True)
+    status: Mapped[str] = mapped_column(Text, nullable=True)
     venue: Mapped[str] = mapped_column(String(200), nullable=True)
     date: Mapped[str] = mapped_column(String(30), nullable=True)
     date_time_gmt: Mapped[str] = mapped_column(String(50), nullable=True)
