@@ -32,7 +32,10 @@ async def _poll():
         data = await _fetch(client, "currentMatches", {"offset": 0})
         matches = data.get("data", [])
         if not matches:
+            print("[Poller] No matches returned from CricAPI")
             return
+
+        kafka_payloads: list[tuple[str, dict]] = []
 
         async with AsyncSessionLocal() as db:
             for m in matches:
@@ -77,9 +80,18 @@ async def _poll():
 
                 payload = {**values, "match_id": match_id}
                 payload.pop("scorecard", None)
-                publish_event("cricket.match-state", match_id, payload)
+                kafka_payloads.append((match_id, payload))
 
+            # Always commit DB first — Kafka is best-effort
             await db.commit()
+            print(f"[Poller] Saved {len(kafka_payloads)} matches to DB")
+
+        # Kafka publish is non-fatal: a failure here never breaks DB writes
+        for match_id, payload in kafka_payloads:
+            try:
+                publish_event("cricket.match-state", match_id, payload)
+            except Exception as e:
+                print(f"[Kafka] Publish skipped for {match_id}: {e}")
 
 
 async def poll():
