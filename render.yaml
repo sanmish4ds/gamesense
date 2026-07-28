@@ -57,7 +57,7 @@ services:
       - key: CRICAPI_KEY
         sync: false
       - key: POLL_INTERVAL_SECONDS
-        value: "900"
+        value: "30"
       - key: SECRET_KEY
         generateValue: true
       - key: ENVIRONMENT
