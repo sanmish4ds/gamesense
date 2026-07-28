@@ -141,7 +141,6 @@ services:
     rootDir: frontend
     buildCommand: npm ci && npm run build
     staticPublishPath: dist
-    plan: free
     envVars:
       # Set this to your backend Render URL after first deploy
       # e.g. https://gamesense-backend.onrender.com
