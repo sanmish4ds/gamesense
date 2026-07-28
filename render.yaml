@@ -26,9 +26,10 @@ services:
   # ── FastAPI Backend ────────────────────────────────────────────────────────
   - type: web
     name: gamesense-backend
-    runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     plan: free
     healthCheckPath: /health
     envVars:
@@ -60,87 +61,12 @@ services:
       - key: ENVIRONMENT
         value: production
 
-  # ── Celery Worker ──────────────────────────────────────────────────────────
-  - type: worker
-    name: gamesense-celery-worker
-    runtime: docker
-    dockerfilePath: ./backend/Dockerfile.worker
-    dockerContext: ./backend
-    plan: free
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: gamesense-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: gamesense-redis
-          property: connectionString
-      - key: KAFKA_BOOTSTRAP_SERVERS
-        sync: false
-      - key: KAFKA_SECURITY_PROTOCOL
-        value: SASL_SSL
-      - key: KAFKA_SASL_MECHANISM
-        value: PLAIN
-      - key: KAFKA_SASL_USERNAME
-        sync: false
-      - key: KAFKA_SASL_PASSWORD
-        sync: false
-      - key: CRICAPI_KEY
-        sync: false
-      - key: SECRET_KEY
-        fromService:
-          type: web
-          name: gamesense-backend
-          envVarKey: SECRET_KEY
-      - key: ENVIRONMENT
-        value: production
-
-  # ── Celery Beat (scheduler) ────────────────────────────────────────────────
-  - type: worker
-    name: gamesense-celery-beat
-    runtime: docker
-    dockerfilePath: ./backend/Dockerfile.beat
-    dockerContext: ./backend
-    plan: free
-    envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: gamesense-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: gamesense-redis
-          property: connectionString
-      - key: KAFKA_BOOTSTRAP_SERVERS
-        sync: false
-      - key: KAFKA_SECURITY_PROTOCOL
-        value: SASL_SSL
-      - key: KAFKA_SASL_MECHANISM
-        value: PLAIN
-      - key: KAFKA_SASL_USERNAME
-        sync: false
-      - key: KAFKA_SASL_PASSWORD
-        sync: false
-      - key: CRICAPI_KEY
-        sync: false
-      - key: SECRET_KEY
-        fromService:
-          type: web
-          name: gamesense-backend
-          envVarKey: SECRET_KEY
-      - key: ENVIRONMENT
-        value: production
-
   # ── React Frontend (static site) ───────────────────────────────────────────
   - type: web
     name: gamesense-frontend
     runtime: static
-    rootDir: frontend
-    buildCommand: npm ci && npm run build
-    staticPublishPath: dist
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/dist
     envVars:
       # Set this to your backend Render URL after first deploy
       # e.g. https://gamesense-backend.onrender.com

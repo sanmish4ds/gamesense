@@ -1,11 +1,11 @@
 """
-Celery task — polls CricAPI for live match updates, persists to PostgreSQL,
+Polls CricAPI for live match updates, persists to PostgreSQL,
 and publishes state changes to Kafka for downstream processing.
+Run as an asyncio background task from the FastAPI lifespan.
 """
 
 import asyncio
 import httpx
-from celery_app import celery
 from sqlalchemy.dialects.postgresql import insert
 
 from app.core.config import settings
@@ -14,18 +14,6 @@ from app.models.match import Match
 from app.kafka.producer import publish_event
 
 CRICAPI_BASE = "https://api.cricapi.com/v1"
-
-
-def _run_async(coro):
-    return asyncio.run(coro)
-
-
-@celery.task(name="app.workers.poller.poll_live_matches", bind=True, max_retries=3)
-def poll_live_matches(self):
-    try:
-        _run_async(_poll())
-    except Exception as exc:
-        raise self.retry(exc=exc, countdown=5)
 
 
 async def _fetch(client: httpx.AsyncClient, endpoint: str, params: dict | None = None) -> dict:
@@ -92,6 +80,11 @@ async def _poll():
                 publish_event("cricket.match-state", match_id, payload)
 
             await db.commit()
+
+
+async def poll():
+    """Entry point called by the FastAPI background task."""
+    await _poll()
 
 
 def _get_batting_team(m: dict) -> str | None:

@@ -55,13 +55,23 @@ async def handle_match_state(data: dict, redis):
     await redis.setex(f"live:{match_id}", 60, json.dumps(data))
 
 
-async def consume_loop():
-    consumer = Consumer({
+def _kafka_config() -> dict:
+    cfg: dict = {
         "bootstrap.servers": settings.KAFKA_BOOTSTRAP_SERVERS,
         "group.id": "gamesense-consumer",
         "auto.offset.reset": "latest",
         "enable.auto.commit": True,
-    })
+    }
+    if settings.KAFKA_SECURITY_PROTOCOL != "PLAINTEXT":
+        cfg["security.protocol"] = settings.KAFKA_SECURITY_PROTOCOL
+        cfg["sasl.mechanism"] = settings.KAFKA_SASL_MECHANISM
+        cfg["sasl.username"] = settings.KAFKA_SASL_USERNAME
+        cfg["sasl.password"] = settings.KAFKA_SASL_PASSWORD
+    return cfg
+
+
+async def consume_loop():
+    consumer = Consumer(_kafka_config())
     consumer.subscribe(TOPICS)
 
     redis = await get_redis()
