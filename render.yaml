@@ -65,7 +65,7 @@ services:
 
   # ── React Frontend (static site) ───────────────────────────────────────────
   - type: web
-    name: gamesense-frontend
+    name: gamesense
     runtime: static
     buildCommand: cd frontend && npm ci && npm run build
     staticPublishPath: frontend/dist
